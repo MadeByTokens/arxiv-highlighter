@@ -46,16 +46,28 @@ export function AnnotationLayer({
     };
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
+        // Allow multi-touch gestures (pinch-zoom, two-finger scroll) to pass through
+        if ('touches' in e && e.touches.length > 1) return;
         if ('button' in e && e.button !== 0) return;
-        e.preventDefault(); // Prevent Safari pull-to-refresh
+        // Don't preventDefault on start - let the gesture begin naturally
         const { x, y } = getEventCoords(e);
         setOrigin({ x, y });
         setDrawing(true);
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
+        // Allow multi-touch gestures (pinch-zoom, two-finger scroll)
+        if ('touches' in e && e.touches.length > 1) {
+            // Cancel any drawing if user switches to multi-touch
+            if (drawing) {
+                setDrawing(false);
+                setOrigin(null);
+                setCurrentRect(null);
+            }
+            return;
+        }
         if (!drawing || !origin) return;
-        e.preventDefault(); // Prevent scroll during drag
+        e.preventDefault(); // Only prevent scroll during single-finger drag
         const { x, y } = getEventCoords(e);
 
         setCurrentRect({
@@ -111,24 +123,7 @@ export function AnnotationLayer({
 
 
     return (
-        <div
-            ref={containerRef}
-            id="annotation-layer"
-            style={{
-                width: viewport.width,
-                height: viewport.height,
-                position: 'absolute',
-                top: 0,
-                left: 0,
-            }}
-            onMouseDown={handleStart}
-            onMouseMove={handleMove}
-            onMouseUp={handleEnd}
-            onTouchStart={handleStart}
-            onTouchMove={handleMove}
-            onTouchEnd={handleEnd}
-            onContextMenu={(e) => e.preventDefault()}
-        >
+        <>
             {modalState?.isOpen && (
                 <NoteModal
                     initialNote={modalState.initialNote}
@@ -137,55 +132,74 @@ export function AnnotationLayer({
                     onDelete={modalState.index !== undefined ? handleDelete : undefined}
                 />
             )}
-            {pageAnnotations.map((ann) => (
-                <div
-                    key={ann.originalIndex}
-                    className="annotation-rectangle"
-                    style={{
-                        position: 'absolute',
-                        left: ann.x1 * 100 + '%',
-                        top: ann.y1 * 100 + '%',
-                        width: (ann.x2 - ann.x1) * 100 + '%',
-                        height: (ann.y2 - ann.y1) * 100 + '%',
-                        backgroundColor: RECTCOLOURS[ann.color] || ann.color,
-                        opacity: hoveredIdx === ann.originalIndex ? alpha + 0.2 : alpha,
-                        cursor: 'pointer',
-                        border: hoveredIdx === ann.originalIndex ? '2px solid white' : '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '2px',
-                        boxShadow: hoveredIdx === ann.originalIndex ? '0 0 15px rgba(255,255,255,0.3)' : 'none',
-                        transition: 'all 0.2s',
-                        zIndex: hoveredIdx === ann.originalIndex ? 100 : 1,
-                        transform: hoveredIdx === ann.originalIndex ? 'scale(1.02)' : 'scale(1)',
-                    }}
-                    onMouseEnter={() => setHoveredIdx(ann.originalIndex)}
-                    onMouseLeave={() => setHoveredIdx(null)}
-                    title={ann.note}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setModalState({ isOpen: true, index: ann.originalIndex, initialNote: ann.note });
-                    }}
-                    onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setModalState({ isOpen: true, index: ann.originalIndex, initialNote: ann.note });
-                    }}
-                />
-            ))}
-            {currentRect && (
-                <div
-                    style={{
-                        position: 'absolute',
-                        left: currentRect.x * 100 + '%',
-                        top: currentRect.y * 100 + '%',
-                        width: currentRect.w * 100 + '%',
-                        height: currentRect.h * 100 + '%',
-                        border: '2px dashed white',
-                        backgroundColor: RECTCOLOURS[currentColor],
-                        opacity: alpha,
-                        pointerEvents: 'none',
-                    }}
-                />
-            )}
-        </div>
+            <div
+                ref={containerRef}
+                id="annotation-layer"
+                style={{
+                    width: viewport.width,
+                    height: viewport.height,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                }}
+                onMouseDown={handleStart}
+                onMouseMove={handleMove}
+                onMouseUp={handleEnd}
+                onTouchStart={handleStart}
+                onTouchMove={handleMove}
+                onTouchEnd={handleEnd}
+                onContextMenu={(e) => e.preventDefault()}
+            >
+                {pageAnnotations.map((ann) => (
+                    <div
+                        key={ann.originalIndex}
+                        className="annotation-rectangle"
+                        style={{
+                            position: 'absolute',
+                            left: ann.x1 * 100 + '%',
+                            top: ann.y1 * 100 + '%',
+                            width: (ann.x2 - ann.x1) * 100 + '%',
+                            height: (ann.y2 - ann.y1) * 100 + '%',
+                            backgroundColor: RECTCOLOURS[ann.color] || ann.color,
+                            opacity: hoveredIdx === ann.originalIndex ? alpha + 0.2 : alpha,
+                            cursor: 'pointer',
+                            border: hoveredIdx === ann.originalIndex ? '2px solid white' : '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '2px',
+                            boxShadow: hoveredIdx === ann.originalIndex ? '0 0 15px rgba(255,255,255,0.3)' : 'none',
+                            transition: 'all 0.2s',
+                            zIndex: hoveredIdx === ann.originalIndex ? 100 : 1,
+                            transform: hoveredIdx === ann.originalIndex ? 'scale(1.02)' : 'scale(1)',
+                        }}
+                        onMouseEnter={() => setHoveredIdx(ann.originalIndex)}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                        title={ann.note}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setModalState({ isOpen: true, index: ann.originalIndex, initialNote: ann.note });
+                        }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setModalState({ isOpen: true, index: ann.originalIndex, initialNote: ann.note });
+                        }}
+                    />
+                ))}
+                {currentRect && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            left: currentRect.x * 100 + '%',
+                            top: currentRect.y * 100 + '%',
+                            width: currentRect.w * 100 + '%',
+                            height: currentRect.h * 100 + '%',
+                            border: '2px dashed white',
+                            backgroundColor: RECTCOLOURS[currentColor],
+                            opacity: alpha,
+                            pointerEvents: 'none',
+                        }}
+                    />
+                )}
+            </div>
+        </>
     );
 }

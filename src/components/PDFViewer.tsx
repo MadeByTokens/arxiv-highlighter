@@ -10,16 +10,73 @@ interface PDFViewerProps {
     page: number;
     onLoad: (totalPages: number) => void;
     onRender: (viewport: any) => void;
+    onTitleLoad?: (title: string) => void;
     children?: any;
 }
 
-export function PDFViewer({ url, page, onLoad, onRender, children }: PDFViewerProps) {
+export function PDFViewer({ url, page, onLoad, onRender, onTitleLoad, children }: PDFViewerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
     const [loading, setLoading] = useState(false);
     const [rendering, setRendering] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Zoom and pan state for pinch-to-zoom and drag
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [pinchStartDistance, setPinchStartDistance] = useState<number | null>(null);
+    const [pinchStartZoom, setPinchStartZoom] = useState(1);
+    const [lastMidpoint, setLastMidpoint] = useState<{ x: number, y: number } | null>(null);
+
+    // Pinch gesture handlers
+    const getPinchDistance = (touches: TouchList) => {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const getMidpoint = (touches: TouchList) => ({
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+    });
+
+    const handleTouchStart = (e: TouchEvent) => {
+        if (e.touches.length === 2) {
+            e.preventDefault(); // Always prevent browser zoom
+            const distance = getPinchDistance(e.touches);
+            setPinchStartDistance(distance);
+            setPinchStartZoom(zoom);
+            setLastMidpoint(getMidpoint(e.touches));
+        }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length === 2 && pinchStartDistance !== null) {
+            e.preventDefault(); // Always prevent browser zoom
+
+            const currentDistance = getPinchDistance(e.touches);
+            const currentMidpoint = getMidpoint(e.touches);
+
+            // Apply zoom based on pinch distance change
+            const scale = currentDistance / pinchStartDistance;
+            const newZoom = Math.min(Math.max(pinchStartZoom * scale, 0.5), 4);
+            setZoom(newZoom);
+
+            // Apply pan/drag based on midpoint movement
+            if (lastMidpoint) {
+                const dx = currentMidpoint.x - lastMidpoint.x;
+                const dy = currentMidpoint.y - lastMidpoint.y;
+                setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+            }
+            setLastMidpoint(currentMidpoint);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setPinchStartDistance(null);
+        setLastMidpoint(null);
+    };
 
     useEffect(() => {
         if (!url) return;
@@ -73,6 +130,23 @@ export function PDFViewer({ url, page, onLoad, onRender, children }: PDFViewerPr
                 if (!cachedData) {
                     const data = await pdfDoc.getData();
                     await PDFCache.set(url, data);
+                }
+
+                // Extract title from PDF metadata
+                if (onTitleLoad) {
+                    try {
+                        const metadata = await pdfDoc.getMetadata();
+                        console.log('[PDFViewer] PDF Metadata:', metadata.info);
+                        const title = (metadata.info as any)?.Title || '';
+                        if (title) {
+                            console.log('[PDFViewer] Found PDF title:', title);
+                            onTitleLoad(title);
+                        } else {
+                            console.log('[PDFViewer] No title in PDF metadata');
+                        }
+                    } catch (e) {
+                        console.log('Could not extract PDF metadata:', e);
+                    }
                 }
 
                 setPdf(pdfDoc);
@@ -157,7 +231,18 @@ export function PDFViewer({ url, page, onLoad, onRender, children }: PDFViewerPr
                     <span>Rendering page...</span>
                 </div>
             )}
-            <div style={{ position: 'relative', display: 'inline-block' }}>
+            <div
+                style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transformOrigin: 'top center',
+                    transition: pinchStartDistance !== null ? 'none' : 'transform 0.1s ease-out'
+                }}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                 <canvas ref={canvasRef} style={{ display: 'block' }} />
                 {children}
             </div>

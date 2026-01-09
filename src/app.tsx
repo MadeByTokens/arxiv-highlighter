@@ -14,6 +14,13 @@ const hasUrlInHash = () => {
   return !!params.get('url');
 };
 
+// Extract ArXiv paper ID from URL for fallback title
+const extractArxivId = (url: string): string | null => {
+  // Match patterns like arxiv.org/pdf/2103.04423 or arxiv.org/abs/2103.04423
+  const match = url.match(/arxiv\.org\/(?:pdf|abs)\/(\d{4}\.\d{4,5}(?:v\d+)?)/i);
+  return match ? match[1] : null;
+};
+
 export function App() {
   const { state, setUrl, setPage, setAlpha, addAnnotation, updateAnnotation, deleteAnnotation } = useURLState();
   const [totalPages, setTotalPages] = useState(0);
@@ -22,6 +29,7 @@ export function App() {
   const [isLanding, setIsLanding] = useState(!hasUrlInHash());
   const [tempUrl, setTempUrl] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [documentTitle, setDocumentTitle] = useState('');
 
   // When state.url changes (e.g., from hash parsing), exit landing page
   useEffect(() => {
@@ -113,6 +121,7 @@ export function App() {
         page={state.page}
         onLoad={setTotalPages}
         onRender={setViewport}
+        onTitleLoad={setDocumentTitle}
       >
         {viewport && (
           <AnnotationLayer
@@ -154,9 +163,16 @@ export function App() {
         <button
           className="btn-share"
           onClick={async () => {
+            // Use document title, or fallback to ArXiv ID from URL
+            const arxivId = extractArxivId(state.url);
+            const displayTitle = documentTitle || (arxivId ? `ArXiv paper ${arxivId}` : null);
+
+            const shareText = displayTitle
+              ? `Check out my annotated PDF: "${displayTitle}"`
+              : 'Check out my annotated PDF!';
             const shareData = {
-              title: 'ArXiv Highlighter',
-              text: 'Check out my annotated PDF!',
+              title: displayTitle || 'ArXiv Highlighter',
+              text: shareText,
               url: window.location.href,
             };
 

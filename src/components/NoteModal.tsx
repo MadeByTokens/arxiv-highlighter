@@ -1,3 +1,5 @@
+import { createPortal } from 'preact/compat';
+
 interface NoteModalProps {
     initialNote: string;
     onSave: (note: string) => void;
@@ -12,7 +14,8 @@ export function NoteModal({ initialNote, onSave, onCancel, onDelete }: NoteModal
         onSave(formData.get('note') as string);
     };
 
-    return (
+    // Use portal to render outside zoomed container
+    return createPortal(
         <div className="modal-overlay">
             <div className="modal-content premium-card">
                 <h3>{onDelete ? 'Edit Note' : 'Add Note'}</h3>
@@ -38,6 +41,7 @@ export function NoteModal({ initialNote, onSave, onCancel, onDelete }: NoteModal
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
