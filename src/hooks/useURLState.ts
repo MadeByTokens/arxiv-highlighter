@@ -101,7 +101,11 @@ export function useURLState() {
                 params.set('cdata', compressed);
             }
 
-            const newHash = '#' + params.toString().replace(/\+/g, '%20');
+            // Decode characters that don't need encoding in hash fragments
+            const newHash = '#' + params.toString()
+                .replace(/\+/g, '%20')
+                .replace(/%3A/g, ':')
+                .replace(/%2F/g, '/');
             if (window.location.hash !== newHash) {
                 window.history.pushState(null, '', newHash);
             }
