@@ -47,6 +47,7 @@ export function AnnotationLayer({
 
     const handleStart = (e: MouseEvent | TouchEvent) => {
         if ('button' in e && e.button !== 0) return;
+        e.preventDefault(); // Prevent Safari pull-to-refresh
         const { x, y } = getEventCoords(e);
         setOrigin({ x, y });
         setDrawing(true);
@@ -54,6 +55,7 @@ export function AnnotationLayer({
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
         if (!drawing || !origin) return;
+        e.preventDefault(); // Prevent scroll during drag
         const { x, y } = getEventCoords(e);
 
         setCurrentRect({
