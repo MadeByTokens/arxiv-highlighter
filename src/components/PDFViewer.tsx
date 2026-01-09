@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFCache } from '../utils/PDFCache';
 
-// Use the local worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// Use the local worker with dynamic base path
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`;
 
 interface PDFViewerProps {
     url: string;
