@@ -83,29 +83,32 @@ export function useURLState() {
     }, [parseHash]);
 
     const updateURL = useCallback((newState: Partial<URLState>) => {
-        const combinedState = { ...state, ...newState };
-        const params = new URLSearchParams();
+        setState(currentState => {
+            const combinedState = { ...currentState, ...newState };
+            const params = new URLSearchParams();
 
-        if (combinedState.url) params.set('url', combinedState.url);
-        if (combinedState.page !== 1) params.set('page', combinedState.page.toString());
-        if (combinedState.alpha !== 0.3) params.set('alpha', combinedState.alpha.toString());
-        if (combinedState.delay !== 300) params.set('delay', combinedState.delay.toString());
-        if (!combinedState.search) params.set('search', 'false');
+            if (combinedState.url) params.set('url', combinedState.url);
+            if (combinedState.page !== 1) params.set('page', combinedState.page.toString());
+            if (combinedState.alpha !== 0.3) params.set('alpha', combinedState.alpha.toString());
+            if (combinedState.delay !== 300) params.set('delay', combinedState.delay.toString());
+            if (!combinedState.search) params.set('search', 'false');
 
-        if (combinedState.annotations.length > 0) {
-            const annotationStrings = combinedState.annotations.map(a =>
-                `${a.page},${a.color[0]},${a.x1},${a.y1},${a.x2},${a.y2},${a.note}`
-            ).join('&');
-            const compressed = LZString.compressToEncodedURIComponent(annotationStrings);
-            params.set('cdata', compressed);
-        }
+            if (combinedState.annotations.length > 0) {
+                const annotationStrings = combinedState.annotations.map(a =>
+                    `${a.page},${a.color[0]},${a.x1},${a.y1},${a.x2},${a.y2},${a.note}`
+                ).join('&');
+                const compressed = LZString.compressToEncodedURIComponent(annotationStrings);
+                params.set('cdata', compressed);
+            }
 
-        const newHash = '#' + params.toString().replace(/\+/g, '%20'); // URLSearchParams uses + for spaces, we might want to keep it URI friendly
-        if (window.location.hash !== newHash) {
-            window.history.pushState(null, '', newHash);
-            setState(combinedState);
-        }
-    }, [state]);
+            const newHash = '#' + params.toString().replace(/\+/g, '%20');
+            if (window.location.hash !== newHash) {
+                window.history.pushState(null, '', newHash);
+            }
+
+            return combinedState;
+        });
+    }, []);
 
     const setUrl = useCallback((url: string) => updateURL({ url, page: 1, annotations: [] }), [updateURL]);
     const setPage = useCallback((page: number) => updateURL({ page }), [updateURL]);
